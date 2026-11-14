@@ -25,19 +25,30 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Find Android project
+      - name: Extract Android project ZIP
         run: |
-          SETTINGS_FILE=$(find . -type f -name settings.gradle \
-            -not -path '*/.gradle/*' -print -quit)
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
 
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle not found"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Android project ZIP not found"
             exit 1
           fi
 
-          PROJECT_DIR="${SETTINGS_FILE%/settings.gradle}"
+          mkdir -p extracted
+          unzip -q "$ZIP_FILE" -d extracted
+
+          SETTINGS=$(find extracted -type f \
+            -name settings.gradle -print -quit)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle missing inside ZIP"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found project at: $PROJECT_DIR"
+
+          echo "Project found: $PROJECT_DIR"
 
       - name: Build debug APK
         run: |
@@ -47,20 +58,19 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PopUpZero-debug-apk
+          name: PopUpZero-Android-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Package source ZIP
+      - name: Package source
         run: |
           cd "$PROJECT_DIR"
-          zip -r "$GITHUB_WORKSPACE/PopUpZero-Android-source.zip" . \
-            -x ".git/*" "*/build/*" ".gradle/*"
+          zip -r "$GITHUB_WORKSPACE/PopUpZero-Source.zip" . \
+            -x "*/build/*" ".gradle/*"
 
       - name: Upload source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: PopUpZero-Android-source
-          path: PopUpZero-Android-source.zip
-          if-no-files-found: error
+          name: PopUpZero-Source
+          path: PopUpZero-Source.zip
           
